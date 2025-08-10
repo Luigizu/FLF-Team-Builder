@@ -1,16 +1,19 @@
 // Centraliza todas las llamadas a la API de Google Scripts
-const api = {
-    get: async (action) => {
-        try {
-            const response = await fetch(`${API_URL}?action=${action}`);
-            if (!response.ok) throw new Error(`Error en la solicitud GET ${action}`);
-            return await response.json();
-        } catch (error) {
-            console.error(`Error en API GET (${action}):`, error);
-            alert(`No se pudieron cargar los datos: ${action}. Revisa la consola para más detalles.`);
-            return null;
-        }
-    },
+const // VERSIÓN NUEVA Y CORREGIDA
+api.get = async (action) => {
+    try {
+        // Añadimos el objeto de opciones con 'credentials: "omit"'
+        const response = await fetch(`${API_URL}?action=${action}`, {
+            credentials: 'omit' // ¡ESTA ES LA LÍNEA MÁGICA!
+        });
+        if (!response.ok) throw new Error(`Error en la solicitud GET ${action}`);
+        return await response.json();
+    } catch (error) {
+        console.error(`Error en API GET (${action}):`, error);
+        alert(`No se pudieron cargar los datos: ${action}. Revisa la consola para más detalles.`);
+        return null;
+    }
+},
     post: async (data) => {
         try {
             const response = await fetch(API_URL, {
@@ -26,4 +29,5 @@ const api = {
             return { status: 'error', error };
         }
     }
+
 };
