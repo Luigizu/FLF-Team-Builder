@@ -10,36 +10,21 @@
 }
 
 body {
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    font-family: var(--font-family);
-    margin: 0;
+    background-color: var(--primary-color); color: var(--text-color); font-family: var(--font-family); margin: 0;
     background-image: linear-gradient(rgba(10, 15, 31, 0.9), rgba(10, 15, 31, 0.95)), url('../assets/images/background.jpg');
-    background-size: cover;
-    background-attachment: fixed;
-    overflow-x: hidden;
+    background-size: cover; background-attachment: fixed; overflow-x: hidden;
 }
 
 .hidden { display: none !important; }
 
-/* --- Estilos para Pantallas Completas (Loader, Login) --- */
-.screen-container {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    display: flex; justify-content: center; align-items: center;
-    background-color: var(--primary-color);
-    transition: opacity 0.5s ease-in-out, visibility 0.5s;
-    opacity: 0; visibility: hidden; z-index: 9990;
-}
+/* --- Pantallas Completas y App Layout --- */
+.screen-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background-color: var(--primary-color); transition: opacity 0.5s ease-in-out, visibility 0.5s; opacity: 0; visibility: hidden; z-index: 9990; }
 .screen-container.active { opacity: 1; visibility: visible; }
 #loader { z-index: 10000; }
 #login-screen { z-index: 9999; }
-
-/* --- Spinner de Carga Animado --- */
 .loader-content { display: flex; flex-direction: column; align-items: center; }
 .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid var(--accent-blue); width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* --- Layout Principal de la App --- */
 header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background-color: rgba(26, 35, 65, 0.5); border-bottom: 1px solid var(--accent-blue); backdrop-filter: blur(5px); }
 .header-logo { width: 80px; }
 nav button { margin: 0 10px; }
@@ -55,63 +40,32 @@ input, textarea, select { box-sizing: border-box; width: 100%; padding: 12px; ma
 .login-box { background: rgba(10, 15, 31, 0.8); padding: 3rem; border-radius: 15px; border: 1px solid var(--accent-blue); box-shadow: var(--glow-shadow); text-align: center; width: 350px; }
 .logo { width: 150px; margin-bottom: 2rem; }
 
-/* --- NUEVO: Estructura de 3 columnas para Armar Equipos --- */
-#team-builder-screen .three-column-layout {
-    display: grid;
-    grid-template-columns: 1fr 2fr 1fr; /* Dividido en tres tercios (el central más ancho) */
-    gap: 2rem;
-    align-items: start;
-}
-
-/* --- NUEVO: Contenedor estético para la cancha --- */
-.pitch-container {
-    background-color: rgba(26, 35, 65, 0.5);
-    border: 1px solid var(--accent-blue);
-    border-radius: 15px;
-    padding: 1.5rem;
-    box-shadow: 0 0 15px rgba(0, 191, 255, 0.2);
-}
-
-.pitch {
-    background-image: url('../assets/images/field.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    width: 100%;
-    aspect-ratio: 7 / 5;
-    position: relative;
-}
+/* --- Estructura Armar Equipos --- */
+#team-builder-screen .three-column-layout { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 2rem; align-items: start; }
+.pitch-container { background-color: rgba(26, 35, 65, 0.5); border: 1px solid var(--accent-blue); border-radius: 15px; padding: 1.5rem; box-shadow: 0 0 15px rgba(0, 191, 255, 0.2); }
+.pitch { background-image: url('../assets/images/field.svg'); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; aspect-ratio: 7 / 5; position: relative; }
 .player-token {
     position: absolute; display: flex; flex-direction: column; align-items: center;
-    font-size: 0.7rem; color: white; transform: translate(-50%, -50%);
-    text-shadow: 1px 1px 2px black;
+    width: 100px; /* Ancho para que entre el nombre largo */
+    font-size: 0.65rem; /* Letra más pequeña */
+    color: white; transform: translate(-50%, -50%); text-shadow: 1px 1px 2px black;
+    text-align: center;
 }
-.player-token img {
-    width: 40px; height: 40px; border-radius: 50%;
-    border: 2px solid white; object-fit: cover;
-}
+.player-token img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid white; object-fit: cover; margin-bottom: 4px; }
 .teamA .player-token img { border-color: var(--accent-blue); }
 .teamB .player-token img { border-color: var(--accent-red); }
+.roster-column h4 { margin-top: 0; }
+.team-roster-list { list-style-type: none; padding: 0; margin: 0 0 1.5rem 0; }
+.team-roster-list li { background-color: var(--secondary-color); padding: 8px 12px; margin-bottom: 5px; border-radius: 5px; border-left: 3px solid var(--accent-blue); }
+.team-roster-list.teamB li { border-left-color: var(--accent-red); }
 
-/* --- NUEVO: Listas de jugadores en la columna derecha --- */
-.roster-column h4 {
-    margin-top: 0;
-}
-.team-roster-list {
-    list-style-type: none;
-    padding: 0;
-    margin: 0 0 1.5rem 0;
-}
-.team-roster-list li {
-    background-color: var(--secondary-color);
-    padding: 8px 12px;
-    margin-bottom: 5px;
-    border-radius: 5px;
-    border-left: 3px solid var(--accent-blue);
-}
-.team-roster-list.teamB li {
-    border-left-color: var(--accent-red);
-}
+/* --- Modal y Buscador de Jugadores --- */
+.modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: var(--primary-color); padding: 2rem; border-radius: 10px; border: 1px solid var(--accent-blue); width: 90%; max-width: 500px; }
+.search-results-container { max-height: 150px; overflow-y: auto; border: 1px solid var(--secondary-color); border-radius: 5px; margin-top: -1rem; margin-bottom: 1rem; }
+.search-result-item { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--secondary-color); }
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background-color: var(--accent-blue); color: var(--primary-color); }
 
 /* --- Otros --- */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
@@ -119,7 +73,4 @@ input, textarea, select { box-sizing: border-box; width: 100%; padding: 12px; ma
 .player-card:hover { transform: scale(1.05); box-shadow: var(--glow-shadow); }
 .results-table { width: 100%; border-collapse: collapse; }
 .results-table th, .results-table td { padding: 1rem; border-bottom: 1px solid var(--secondary-color); text-align: left; }
-.modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: var(--primary-color); padding: 2rem; border-radius: 10px; border: 1px solid var(--accent-blue); width: 90%; max-width: 500px; }
 @media (max-width: 900px) { #team-builder-screen .three-column-layout { grid-template-columns: 1fr; } }
-
