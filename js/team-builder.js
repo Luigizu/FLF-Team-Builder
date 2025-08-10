@@ -168,18 +168,131 @@ const teamBuilder = {
     },
 
     // Algoritmo de balanceo (sin cambios)
+    // js/team-builder.js (Solo la función balanceTeams)
+
     balanceTeams(players) {
-        // ... El algoritmo que ya tenías sigue aquí ...
-        // Este es un placeholder, el tuyo es más complejo
-        let teamA = { players: [], score: 0 };
-        let teamB = { players: [], score: 0 };
-        players.forEach((p, i) => {
-            if (i % 2 === 0) teamA.players.push(p);
-            else teamB.players.push(p);
+        // Inicializamos los equipos y las listas de roles
+        let teamA = { players: [], score: 0, defenseScore: 0, midfieldScore: 0 };
+        let teamB = { players: [], score: 0, defenseScore: 0, midfieldScore: 0 };
+        let availablePlayers = [...players];
+
+        // Mapeamos a los jugadores con un puntaje temporal para el balanceo
+        // El arquero cuenta como un defensor de 10 puntos para este cálculo
+        availablePlayers.forEach(p => {
+            if (p.posPrimaria === 'Arquero') {
+                p.tempRole = 'Defensa Central';
+                p.tempScore = 10;
+            } else {
+                p.tempRole = p.posPrimaria;
+                p.tempScore = parseInt(p.puntajeGeneral);
+            }
         });
+        
+        // Función auxiliar para asignar un jugador a un equipo
+        const assignPlayer = (player, team) => {
+            team.players.push(player);
+            team.score += player.tempScore;
+            // Quitamos al jugador de la lista de disponibles
+            availablePlayers = availablePlayers.filter(p => p.id !== player.id);
+        };
+
+        // --- INICIO DEL ALGORITMO DE ARMADO ---
+
+        // 1. PRIORIDAD: Asignar un buen Defensa Central a cada equipo
+        let centralDefenders = availablePlayers
+            .filter(p => p.tempRole === 'Defensa Central')
+            .sort((a, b) => b.tempScore - a.tempScore); // De mejor a peor
+        
+        if (centralDefenders.length > 0) assignPlayer(centralDefenders.shift(), teamA);
+        if (centralDefenders.length > 0) assignPlayer(centralDefenders.shift(), teamB);
+
+        // 2. EQUILIBRAR LA DEFENSA (hasta tener 4 defensores por equipo)
+        let otherDefenders = availablePlayers
+            .filter(p => p.tempRole.includes('Defensa'))
+            .sort((a, b) => b.tempScore - a.tempScore);
+        
+        // Juntamos los centrales que sobraron con el resto
+        let allDefenders = [...centralDefenders, ...otherDefenders];
+
+        while ((teamA.players.filter(p => p.tempRole.includes('Defensa')).length < 4 || teamB.players.filter(p => p.tempRole.includes('Defensa')).length < 4) && allDefenders.length > 0) {
+            let playerToAssign = allDefenders.shift();
+            // Asigna al equipo con la defensa más débil
+            if (teamA.defenseScore <= teamB.defenseScore) {
+                assignPlayer(playerToAssign, teamA);
+                teamA.defenseScore += playerToAssign.tempScore;
+            } else {
+                assignPlayer(playerToAssign, teamB);
+                teamB.defenseScore += playerToAssign.tempScore;
+            }
+        }
+        
+        // 3. PRIORIDAD: Asignar un buen Volante Central a cada equipo
+        let centralMidfielders = availablePlayers
+            .filter(p => p.tempRole === 'Volante Central')
+            .sort((a, b) => b.tempScore - a.tempScore);
+
+        if (centralMidfielders.length > 0) assignPlayer(centralMidfielders.shift(), teamA);
+        if (centralMidfielders.length > 0) assignPlayer(centralMidfielders.shift(), teamB);
+        
+        // 4. EQUILIBRAR EL MEDIOCAMPO (hasta tener 4 volantes por equipo)
+        let otherMidfielders = availablePlayers
+            .filter(p => p.tempRole.includes('Volante'))
+            .sort((a, b) => b.tempScore - a.tempScore);
+            
+        let allMidfielders = [...centralMidfielders, ...otherMidfielders];
+        
+        while ((teamA.players.filter(p => p.tempRole.includes('Volante')).length < 4 || teamB.players.filter(p => p.tempRole.includes('Volante')).length < 4) && allMidfielders.length > 0) {
+            let playerToAssign = allMidfielders.shift();
+            // Asigna al equipo con el mediocampo más débil
+            if (teamA.midfieldScore <= teamB.midfieldScore) {
+                assignPlayer(playerToAssign, teamA);
+                teamA.midfieldScore += playerToAssign.tempScore;
+            } else {
+                assignPlayer(playerToAssign, teamB);
+                teamB.midfieldScore += playerToAssign.tempScore;
+            }
+        }
+
+        // 5. ASIGNAR DELANTEROS PARA COMPENSAR (hasta tener 1 por equipo)
+        let attackers = availablePlayers
+            .filter(p => p.tempRole === 'Atacante')
+            .sort((a, b) => b.tempScore - a.tempScore);
+
+        while ((teamA.players.filter(p => p.tempRole.includes('Atacante')).length < 1 || teamB.players.filter(p => p.tempRole.includes('Atacante')).length < 1) && attackers.length > 0) {
+            let playerToAssign = attackers.shift();
+            // Asigna al equipo que tiene MENOS PUNTOS en total para compensar
+            if (teamA.score <= teamB.score) {
+                assignPlayer(playerToAssign, teamA);
+            } else {
+                assignPlayer(playerToAssign, teamB);
+            }
+        }
+        
+        // 6. RELLENAR CON JUGADORES RESTANTES (si faltan)
+        // Se asignan para balancear el puntaje total del equipo
+        while (availablePlayers.length > 0) {
+            let playerToAssign = availablePlayers.shift();
+            if (teamA.players.length <= teamB.players.length) {
+                // Si el equipo A tiene menos jugadores, o los mismos, se le asigna a él
+                // para balancear el puntaje general.
+                 if (teamA.score <= teamB.score) {
+                    assignPlayer(playerToAssign, teamA);
+                 } else {
+                    assignPlayer(playerToAssign, teamB);
+                 }
+            } else {
+                assignPlayer(playerToAssign, teamB);
+            }
+        }
+        
+        // Limpiamos las propiedades temporales que añadimos
+        players.forEach(p => {
+            delete p.tempRole;
+            delete p.tempScore;
+        });
+
         return { teamA, teamB };
     },
-
     // NUEVO: Ubicación horizontal de jugadores en la cancha
     displayTeamsOnPitch(teamA, teamB) {
         const teamADisplay = document.getElementById('teamA-display');
@@ -240,3 +353,4 @@ const teamBuilder = {
         }
     }
 };
+
