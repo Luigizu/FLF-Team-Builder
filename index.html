@@ -12,13 +12,15 @@
 <body>
 
     <!-- PANTALLA DE CARGA INICIAL -->
-    <div id="loader" class="loader-screen active">
-        <div class="spinner"></div>
-        <p>Cargando datos...</p>
+    <div id="loader" class="screen-container active">
+        <div class="loader-content">
+            <div class="spinner"></div>
+            <p>Cargando datos...</p>
+        </div>
     </div>
 
     <!-- PANTALLA DE CREDENCIALES -->
-    <div id="login-screen" class="screen">
+    <div id="login-screen" class="screen-container">
         <div class="login-box">
             <img src="assets/images/logo.png" alt="Logo FLF" class="logo">
             <input type="password" id="password-input" placeholder="Código de acceso">
@@ -27,7 +29,7 @@
         </div>
     </div>
 
-    <!-- CONTENIDO PRINCIPAL -->
+    <!-- CONTENIDO PRINCIPAL (Oculto hasta después del login) -->
     <main id="main-content" class="hidden">
         <header>
             <img src="assets/images/logo.png" alt="Logo FLF" class="header-logo">
