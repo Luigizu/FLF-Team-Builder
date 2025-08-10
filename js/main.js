@@ -1,10 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Estado global de la aplicación
     const state = {
         players: [],
         matches: [],
         currentScreen: 'team-builder-screen',
     };
 
+    // Referencias a elementos del DOM para no buscarlos todo el tiempo
     const selectors = {
         loader: document.getElementById('loader'),
         loginScreen: document.getElementById('login-screen'),
@@ -18,16 +20,31 @@ document.addEventListener('DOMContentLoaded', () => {
         musicToggle: document.getElementById('music-toggle'),
     };
 
+    // Lista de canciones
     const songs = [
         'assets/music/cancion1.mp3',
         'assets/music/cancion2.mp3',
     ];
 
-    function playRandomSong() {
-        if (songs.length === 0) return;
-        const randomIndex = Math.floor(Math.random() * songs.length);
-        selectors.musicPlayer.src = songs[randomIndex];
-        selectors.musicPlayer.play().catch(() => {});
+    // Función principal que se ejecuta al cargar la página
+    async function initializeApp() {
+        const [playersData, matchesData] = await Promise.all([
+            api.get('getPlayers'),
+            api.get('getMatches')
+        ]);
+        
+        if (playersData === null || matchesData === null) {
+            selectors.loader.querySelector('p').textContent = 'Error al cargar. Refresca la página.';
+            selectors.loader.querySelector('.spinner').style.display = 'none';
+            return;
+        }
+        
+        state.players = playersData;
+        state.matches = matchesData;
+
+        // Oculta el loader y muestra la pantalla de login
+        selectors.loader.classList.remove('active');
+        selectors.loginScreen.classList.add('active');
     }
 
     function switchScreen(targetId) {
@@ -53,18 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     }
-    
-    async function initializeApp() {
-        const [playersData, matchesData] = await Promise.all([
-            api.get('getPlayers'),
-            api.get('getMatches')
-        ]);
-        
-        state.players = playersData || [];
-        state.matches = matchesData || [];
 
-        selectors.loader.classList.remove('active');
-        selectors.loginScreen.classList.add('active');
+    function playRandomSong() {
+        if (songs.length === 0) return;
+        const randomIndex = Math.floor(Math.random() * songs.length);
+        selectors.musicPlayer.src = songs[randomIndex];
+        selectors.musicPlayer.play().catch(() => {});
     }
 
     // --- Event Listeners ---
@@ -95,5 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Inicialización ---
     initializeApp();
-    window.appState = state;
+    window.appState = state; // Hacemos el estado accesible globalmente para debugging si es necesario
+});
 });
