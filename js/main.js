@@ -108,4 +108,3 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
     window.appState = state; // Hacemos el estado accesible globalmente para debugging si es necesario
 });
-});
