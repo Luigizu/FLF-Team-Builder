@@ -1,2 +1,0 @@
-// ATENCIÓN: Pega aquí la URL de la aplicación web que obtuviste de Google Apps Script.
-const API_URL = 'https://script.google.com/u/1/home/projects/1T78BZZheLCXQGqIf6fhJWahPLpoI3aYWXiJY2cRe83IPnecEGEVgksOu/edit';
