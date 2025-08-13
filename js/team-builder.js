@@ -263,7 +263,7 @@ const teamBuilder = {
             playerToken.className = 'player-token';
             playerToken.style.left = `${pos[0]}%`;
             playerToken.style.top = `${pos[1]}%`;
-            playerToken.innerHTML = `<img src="${p.foto || 'assets/images/default-player.png'}" alt="${p.nombre}"><span>[${number}] ${p.nombre} ${p.apellido}</span>`;
+            playerToken.innerHTML = `<img src="${player.foto || 'assets/images/default-player.png'}" alt="${player.nombre}"><span>[${number}] ${player.nombre} ${player.apellido}</span>`;
             teamDisplay.appendChild(playerToken);
         };
         
@@ -301,5 +301,6 @@ const teamBuilder = {
         }
     }
 };
+
 
 
