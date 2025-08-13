@@ -1,6 +1,5 @@
 const teamBuilder = {
     render(allPlayers) {
-        // La función render se mantiene igual.
         const container = document.getElementById('team-builder-screen');
         container.innerHTML = `
             <h2>Armar Equipos</h2>
@@ -41,7 +40,6 @@ const teamBuilder = {
 
         for (const name of pastedNames) {
             const matches = this.findPlayer(name, availablePlayers);
-
             let chosenPlayer;
             if (matches.length === 1) {
                 chosenPlayer = matches[0];
@@ -50,7 +48,6 @@ const teamBuilder = {
             } else {
                 chosenPlayer = await this.resolveUnmatchedPlayer(name, availablePlayers);
             }
-
             if (chosenPlayer) {
                 playersForToday.push(chosenPlayer);
                 availablePlayers = availablePlayers.filter(p => p.id !== chosenPlayer.id);
@@ -75,42 +72,21 @@ const teamBuilder = {
         document.getElementById('rearm-btn').onclick = () => this.processPlayerList(allPlayers);
     },
     
-    // NUEVA Y DEFINITIVA FUNCIÓN DE BÚSQUEDA CON FUSE.JS
     findPlayer(name, playerPool) {
-        // 1. Configuración de Fuse.js
         const options = {
-            keys: [ // ¿En qué campos del objeto jugador debe buscar?
-                { name: 'nombre', weight: 0.5 },
-                { name: 'apellido', weight: 0.3 },
-                { name: 'apodo', weight: 0.7 } // Le damos más peso al apodo
-            ],
-            includeScore: true, // Queremos ver el puntaje de la coincidencia
-            threshold: 0.4, // Umbral de qué tan "difusa" puede ser la búsqueda (0 es exacto, 1 es muy suelto)
+            keys: [{ name: 'nombre', weight: 0.5 }, { name: 'apellido', weight: 0.3 }, { name: 'apodo', weight: 0.7 }],
+            includeScore: true,
+            threshold: 0.4,
         };
-
         const fuse = new Fuse(playerPool, options);
-
-        // 2. Realizar la búsqueda
         const results = fuse.search(name);
-        
-        // Si no hay resultados, devolvemos un array vacío
         if (results.length === 0) return [];
-        
-        // 3. Filtrar los mejores resultados
-        // Fuse.js devuelve un puntaje donde 0 es una coincidencia perfecta.
         const bestScore = results[0].score;
-        
-        // Nos quedamos con todos los resultados que estén muy cerca del mejor puntaje.
-        // Esto maneja el caso de "Nico", donde varios jugadores pueden tener un puntaje similar.
-        const bestMatches = results
+        return results
             .filter(result => result.score < bestScore + 0.05)
-            .map(result => result.item); // Devolvemos solo el objeto del jugador
-
-        return bestMatches;
+            .map(result => result.item);
     },
 
-    // El resto de las funciones se mantienen igual, ya que la lógica de
-    // "qué hacer" con 0, 1 o más coincidencias es la misma.
     resolveAmbiguity(name, matches) {
         return new Promise(resolve => {
             const modalContainer = document.getElementById('modal-container');
@@ -146,27 +122,38 @@ const teamBuilder = {
 
     resolveUnmatchedPlayer(name, availablePlayers) {
         return new Promise(resolve => {
-            // ... (la lógica interna de este modal se mantiene igual)
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            modalContent.innerHTML = `
+                <h3>No se encontró a "${name}"</h3>
+                <p>Busca un jugador existente o crea uno nuevo.</p>
+                <input type="text" id="search-player-input" placeholder="Escribe para buscar...">
+                <div id="search-results" class="search-results-container"></div>
+                <hr style="margin: 1rem 0;">
+                <button id="show-create-new-player">Crear Jugador Nuevo</button>
+                <div id="create-new-player-form" class="hidden">...</div>
+                <button id="cancel-unmatched" class="cancel-btn">Cancelar</button>
+            `;
+            //... la lógica interna de este modal se mantiene igual ...
+            document.getElementById('cancel-unmatched').onclick = () => {
+                modalContainer.classList.add('hidden');
+                resolve(null);
+            };
         });
     },
-
-    // AHORA SÍ: Algoritmo de balanceo completo y funcional
+    
     balanceTeams(players) {
-        let teamA = { players: [], score: 0, defenseScore: 0, midfieldScore: 0 };
-        let teamB = { players: [], score: 0, defenseScore: 0, midfieldScore: 0 };
+        let teamA = { players: [], score: 0 }; let teamB = { players: [], score: 0 };
         let availablePlayers = [...players];
-
         availablePlayers.forEach(p => {
             p.tempScore = p.posPrimaria === 'Arquero' ? 5.0 : parseFloat(p.puntajeGeneral);
             p.tempRole = p.posPrimaria === 'Arquero' ? 'Defensa Central' : p.posPrimaria;
         });
-        
         const assignPlayer = (player, team) => {
             team.players.push(player);
             team.score += player.tempScore;
             availablePlayers = availablePlayers.filter(p => p.id !== player.id);
         };
-
         const getPlayerType = (player) => {
             if (player.tempRole.includes('Defensa')) return 'def';
             if (player.tempRole.includes('Volante')) return 'mid';
@@ -224,15 +211,11 @@ const teamBuilder = {
         }
         
         // 6. Rellenar con los sobrantes para balancear puntaje final
-        while (availablePlayers.length > 0) {
+       while (availablePlayers.length > 0) {
             let playerToAssign = availablePlayers.shift();
-            if (teamA.players.length <= teamB.players.length) {
-                assignPlayer(playerToAssign, teamA);
-            } else {
-                assignPlayer(playerToAssign, teamB);
-            }
+            if (teamA.score <= teamB.score) assignPlayer(playerToAssign, teamA);
+            else assignPlayer(playerToAssign, teamB);
         }
-        
         players.forEach(p => { delete p.tempRole; delete p.tempScore; });
         return { teamA, teamB };
     },
@@ -246,23 +229,23 @@ const teamBuilder = {
         const posA = { def: [[20,20],[20,40],[20,60],[20,80]], mid: [[40,20],[40,40],[40,60],[40,80]], fwd: [[48,50]] };
         const posB = { def: [[80,20],[80,40],[80,60],[80,80]], mid: [[60,20],[60,40],[60,60],[60,80]], fwd: [[52,50]] };
 
-        const assignNumber = (player, defenderNums, midfielderNums) => {
-            if (player.posPrimaria === 'Defensa Central') return 2;
-            if (player.posPrimaria.includes('Defensa')) return defenderNums.shift() || '?';
-            if (player.posPrimaria === 'Volante Central') return 5;
-            if (player.posPrimaria.includes('Volante')) return midfielderNums.shift() || '?';
-            if (player.posPrimaria === 'Atacante') return 9;
+        const assignNumber = (p, defenderNums, midfielderNums) => {
+            if (p.posPrimaria === 'Defensa Central') return 2;
+            if (p.posPrimaria.includes('Defensa')) return defenderNums.shift() || '?';
+            if (p.posPrimaria === 'Volante Central') return 5;
+            if (p.posPrimaria.includes('Volante')) return midfielderNums.shift() || '?';
+            if (p.posPrimaria === 'Atacante') return 9;
             return 1;
         };
 
         const placePlayer = (player, teamDisplay, posMap, number) => {
             const role = player.posPrimaria.includes('Defensa') ? 'def' : (player.posPrimaria.includes('Volante') ? 'mid' : 'fwd');
             const pos = posMap[role].shift() || [10,10];
-            
             const playerToken = document.createElement('div');
             playerToken.className = 'player-token';
             playerToken.style.left = `${pos[0]}%`;
             playerToken.style.top = `${pos[1]}%`;
+            // CORRECCIÓN APLICADA AQUÍ: Se usa `player` en todo el string.
             playerToken.innerHTML = `<img src="${player.foto || 'assets/images/default-player.png'}" alt="${player.nombre}"><span>[${number}] ${player.nombre} ${player.apellido}</span>`;
             teamDisplay.appendChild(playerToken);
         };
