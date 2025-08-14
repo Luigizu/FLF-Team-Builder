@@ -120,10 +120,12 @@ const teamBuilder = {
         });
     },
 
+    // AHORA SÍ: Función completamente implementada, sin placeholders
     resolveUnmatchedPlayer(name, availablePlayers) {
         return new Promise(resolve => {
             const modalContainer = document.getElementById('modal-container');
             const modalContent = document.getElementById('modal-content');
+            
             modalContent.innerHTML = `
                 <h3>No se encontró a "${name}"</h3>
                 <p>Busca un jugador existente o crea uno nuevo.</p>
@@ -131,10 +133,61 @@ const teamBuilder = {
                 <div id="search-results" class="search-results-container"></div>
                 <hr style="margin: 1rem 0;">
                 <button id="show-create-new-player">Crear Jugador Nuevo</button>
-                <div id="create-new-player-form" class="hidden">...</div>
+                <div id="create-new-player-form" class="hidden">
+                    <h4>Crear: ${name}</h4>
+                    <input id="new-player-nombre" type="text" placeholder="Nombre" value="${name.split(' ')[0] || ''}">
+                    <input id="new-player-apellido" type="text" placeholder="Apellido" value="${name.split(' ')[1] || ''}">
+                    <select id="new-player-pos1"><option value="">Posición Primaria</option><option>Arquero</option><option>Defensa Central</option><option>Defensa Lateral</option><option>Volante Central</option><option>Volante Lateral</option><option>Atacante</option></select>
+                    <label for="new-player-habilidad">Puntaje General (1.0 - 5.0)</label>
+                    <input id="new-player-habilidad" type="number" step="0.1" min="1" max="5" placeholder="ej: 3.5">
+                    <button id="save-new-player">Guardar Nuevo Jugador</button>
+                </div>
                 <button id="cancel-unmatched" class="cancel-btn">Cancelar</button>
             `;
-            //... la lógica interna de este modal se mantiene igual ...
+            modalContainer.classList.remove('hidden');
+
+            const searchInput = document.getElementById('search-player-input');
+            const searchResultsContainer = document.getElementById('search-results');
+
+            const renderResults = (query) => {
+                searchResultsContainer.innerHTML = '';
+                if (!query) return;
+                const filtered = availablePlayers.filter(p => `${p.nombre} ${p.apellido}`.toLowerCase().includes(query.toLowerCase()));
+                filtered.forEach(player => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.textContent = `${player.nombre} ${player.apellido} (${player.puntajeGeneral})`;
+                    item.onclick = () => { modalContainer.classList.add('hidden'); resolve(player); };
+                    searchResultsContainer.appendChild(item);
+                });
+            };
+            
+            searchInput.addEventListener('keyup', (e) => renderResults(e.target.value));
+
+            document.getElementById('show-create-new-player').onclick = () => {
+                document.getElementById('create-new-player-form').classList.remove('hidden');
+            };
+            
+            document.getElementById('save-new-player').onclick = async () => {
+                const puntaje = parseFloat(document.getElementById('new-player-habilidad').value);
+                if (isNaN(puntaje) || puntaje < 1 || puntaje > 5) {
+                    alert("Por favor, ingresa un puntaje válido entre 1.0 y 5.0.");
+                    return;
+                }
+                const newPlayerData = {
+                    nombre: document.getElementById('new-player-nombre').value,
+                    apellido: document.getElementById('new-player-apellido').value,
+                    posPrimaria: document.getElementById('new-player-pos1').value,
+                    puntajeGeneral: puntaje,
+                    apodo: ''
+                };
+                await api.post({ action: 'addPlayer', player: newPlayerData });
+                window.appState.players = await api.get('getPlayers');
+                const addedPlayer = window.appState.players[window.appState.players.length - 1];
+                modalContainer.classList.add('hidden');
+                resolve(addedPlayer);
+            };
+            
             document.getElementById('cancel-unmatched').onclick = () => {
                 modalContainer.classList.add('hidden');
                 resolve(null);
@@ -355,6 +408,7 @@ const teamBuilder = {
         }
     }
 };
+
 
 
 
