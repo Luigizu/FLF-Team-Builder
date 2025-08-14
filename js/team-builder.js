@@ -39,15 +39,19 @@ const teamBuilder = {
         let availablePlayers = [...allPlayers];
 
         for (const name of pastedNames) {
-            const matches = this.findPlayer(name, availablePlayers);
+            const results = this.findPlayer(name, availablePlayers);
             let chosenPlayer;
-            if (matches.length === 1) {
-                chosenPlayer = matches[0];
-            } else if (matches.length > 1) {
-                chosenPlayer = await this.resolveAmbiguity(name, matches);
-            } else {
+
+            if (results.length === 1 && results[0].score < 0.01) { // Coincidencia casi perfecta, se acepta automáticamente
+                chosenPlayer = results[0].player;
+            } else if (results.length === 1) { // Una sola coincidencia, pero no es perfecta. Pedir confirmación.
+                chosenPlayer = await this.confirmSingleMatch(name, results[0].player, availablePlayers);
+            } else if (results.length > 1) { // Múltiples coincidencias
+                chosenPlayer = await this.resolveAmbiguity(name, results.map(r => r.player));
+            } else { // Sin coincidencias
                 chosenPlayer = await this.resolveUnmatchedPlayer(name, availablePlayers);
             }
+
             if (chosenPlayer) {
                 playersForToday.push(chosenPlayer);
                 availablePlayers = availablePlayers.filter(p => p.id !== chosenPlayer.id);
@@ -83,8 +87,33 @@ const teamBuilder = {
         if (results.length === 0) return [];
         const bestScore = results[0].score;
         return results
-            .filter(result => result.score < bestScore + 0.05)
-            .map(result => result.item);
+            .filter(result => result.score < bestScore + 0.1) // Un poco más de margen para agrupar similares
+            .map(result => ({ player: result.item, score: result.score }));
+    },
+
+    // NUEVO: Modal para confirmar una única coincidencia "difusa"
+    confirmSingleMatch(name, potentialMatch, availablePlayers) {
+        return new Promise(resolve => {
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            modalContent.innerHTML = `
+                <h3>Confirmar Jugador</h3>
+                <p>Para <strong>"${name}"</strong>, ¿te refieres a <strong>${potentialMatch.nombre} ${potentialMatch.apellido}</strong>?</p>
+                <button id="confirm-yes">Sí, es correcto</button>
+                <button id="confirm-no" class="cancel-btn">No, buscar otro o crear</button>
+            `;
+            modalContainer.classList.remove('hidden');
+
+            document.getElementById('confirm-yes').onclick = () => {
+                modalContainer.classList.add('hidden');
+                resolve(potentialMatch);
+            };
+            document.getElementById('confirm-no').onclick = async () => {
+                // Si el usuario dice que no, reutilizamos el modal de búsqueda/creación
+                const player = await this.resolveUnmatchedPlayer(name, availablePlayers);
+                resolve(player);
+            };
+        });
     },
 
     resolveAmbiguity(name, matches) {
@@ -120,12 +149,10 @@ const teamBuilder = {
         });
     },
 
-    // AHORA SÍ: Función completamente implementada, sin placeholders
-    resolveUnmatchedPlayer(name, availablePlayers) {
+   resolveUnmatchedPlayer(name, availablePlayers) {
         return new Promise(resolve => {
             const modalContainer = document.getElementById('modal-container');
             const modalContent = document.getElementById('modal-content');
-            
             modalContent.innerHTML = `
                 <h3>No se encontró a "${name}"</h3>
                 <p>Busca un jugador existente o crea uno nuevo.</p>
@@ -138,6 +165,7 @@ const teamBuilder = {
                     <input id="new-player-nombre" type="text" placeholder="Nombre" value="${name.split(' ')[0] || ''}">
                     <input id="new-player-apellido" type="text" placeholder="Apellido" value="${name.split(' ')[1] || ''}">
                     <select id="new-player-pos1"><option value="">Posición Primaria</option><option>Arquero</option><option>Defensa Central</option><option>Defensa Lateral</option><option>Volante Central</option><option>Volante Lateral</option><option>Atacante</option></select>
+                    <select id="new-player-pos2"><option value="">Posición Secundaria (Opcional)</option><option>Arquero</option><option>Defensa Central</option><option>Defensa Lateral</option><option>Volante Central</option><option>Volante Lateral</option><option>Atacante</option></select>
                     <label for="new-player-habilidad">Puntaje General (1.0 - 5.0)</label>
                     <input id="new-player-habilidad" type="number" step="0.1" min="1" max="5" placeholder="ej: 3.5">
                     <button id="save-new-player">Guardar Nuevo Jugador</button>
@@ -178,6 +206,7 @@ const teamBuilder = {
                     nombre: document.getElementById('new-player-nombre').value,
                     apellido: document.getElementById('new-player-apellido').value,
                     posPrimaria: document.getElementById('new-player-pos1').value,
+                    posSecundaria: document.getElementById('new-player-pos2').value,
                     puntajeGeneral: puntaje,
                     apodo: ''
                 };
@@ -348,9 +377,12 @@ const teamBuilder = {
         const positionsB = assignPositions(teamB.players);
 
         const posCoords = {
-             3: { x: 20, y: 20 },  2: { x: 20, y: 40 },  6: { x: 20, y: 60 },  4: { x: 20, y: 80 },
-             7: { x: 40, y: 25 },  5: { x: 40, y: 50 },  8: { x: 40, y: 75 }, // Para el 2do 5, lo pondremos cerca
-             9: { x: 48, y: 50 }
+             // Columna 1 (Defensas) - Más cerca del arco (X bajo)
+             3: { x: 15, y: 20 },  2: { x: 15, y: 40 },  6: { x: 15, y: 60 },  4: { x: 15, y: 80 },
+             // Columna 2 (Volantes) - Más lejos del centro
+             7: { x: 35, y: 25 },  5: { x: 35, y: 50 },  8: { x: 35, y: 75 },
+             // Columna 3 (Delantero) - Un poco más lejos del centro
+             9: { x: 47, y: 50 }
         };
 
         const drawTeam = (positions, teamClass) => {
@@ -408,6 +440,7 @@ const teamBuilder = {
         }
     }
 };
+
 
 
 
