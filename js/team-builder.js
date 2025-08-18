@@ -324,90 +324,87 @@ const teamBuilder = {
         return { teamA, teamB };
     },
     
-    // CORREGIDO: Lógica de numeración y posicionamiento
     displayTeamsOnPitch(teamA, teamB) {
         const pitchDisplay = document.getElementById('pitch-display');
-        pitchDisplay.innerHTML = ''; // Limpia la cancha antes de dibujar
+        pitchDisplay.innerHTML = '';
 
-        const assignPositions = (team) => {
-            const positions = [];
-            const posLayout = { col1: [3,2,6,4], col2: [7,5,5,8], col3: [9] };
-            
-            const assigned = new Set();
-            const assign = (player) => {
-                assigned.add(player.id);
-                return player;
-            }
-
-            // Asigna posiciones fijas primero
-            const dc = team.find(p => p.posPrimaria === 'Defensa Central' && !assigned.has(p.id));
-            if (dc) positions.push({player: assign(dc), number: 2});
-
-            let centralMids = team.filter(p => p.posPrimaria === 'Volante Central' && !assigned.has(p.id));
-            if(centralMids[0]) positions.push({player: assign(centralMids[0]), number: 5});
-            if(centralMids[1]) positions.push({player: assign(centralMids[1]), number: 5});
-
-            const fwd = team.find(p => p.posPrimaria === 'Atacante' && !assigned.has(p.id));
-            if (fwd) positions.push({player: assign(fwd), number: 9});
-
-            // Asigna resto de posiciones
-            const otherDefs = team.filter(p => p.posPrimaria.includes('Defensa') && !assigned.has(p.id));
-            posLayout.col1.filter(n => n !== 2).forEach(num => {
-                if(otherDefs.length > 0) positions.push({player: assign(otherDefs.shift()), number: num});
-            });
-
-            const otherMids = team.filter(p => p.posPrimaria.includes('Volante') && !assigned.has(p.id));
-             posLayout.col2.filter(n => n !== 5).forEach(num => {
-                if(otherMids.length > 0) positions.push({player: assign(otherMids.shift()), number: num});
-            });
-            
-            // Rellena los huecos que queden con los jugadores sobrantes
-            const remainingPlayers = team.filter(p => !assigned.has(p.id));
-            const allPos = [3,2,6,4,7,5,5,8,9];
-            allPos.forEach(num => {
-                if (!positions.find(p => p.number === num) && remainingPlayers.length > 0) {
-                     positions.push({player: assign(remainingPlayers.shift()), number: num});
-                }
-            })
-
-            return positions;
+        // Definimos la grilla de coordenadas EXACTA
+        const posCoords = {
+            // Defensas (Columna 1)
+            3: { x: 15, y: 20 },
+            2: { x: 15, y: 40 },
+            6: { x: 15, y: 60 },
+            4: { x: 15, y: 80 },
+            // Volantes (Columna 2)
+            7: { x: 35, y: 20 }, // Delante del 3
+            5.1: { x: 35, y: 40 }, // Delante del 2 (usamos .1 y .2 para diferenciar los dos 5)
+            5.2: { x: 35, y: 60 }, // Delante del 6
+            8: { x: 35, y: 80 }, // Delante del 4
+            // Delantero (Columna 3)
+            9: { x: 47, y: 50 }
         };
 
-        const positionsA = assignPositions(teamA.players);
-        const positionsB = assignPositions(teamB.players);
+        const assignPositions = (team) => {
+            const assignedPlayers = new Set();
+            let positions = [];
 
-        const posCoords = {
-             // Columna 1 (Defensas) - Más cerca del arco (X bajo)
-             3: { x: 15, y: 20 },  2: { x: 15, y: 40 },  6: { x: 15, y: 60 },  4: { x: 15, y: 80 },
-             // Columna 2 (Volantes) - Más lejos del centro
-             7: { x: 35, y: 25 },  5: { x: 35, y: 50 },  8: { x: 35, y: 75 },
-             // Columna 3 (Delantero) - Un poco más lejos del centro
-             9: { x: 47, y: 50 }
+            const findAndAssign = (posNumber, condition) => {
+                const player = team.find(p => condition(p) && !assignedPlayers.has(p.id));
+                if (player) {
+                    positions.push({ player, number: posNumber });
+                    assignedPlayers.add(player.id);
+                }
+            };
+
+            // Asignar posiciones clave primero
+            findAndAssign(9, p => p.posPrimaria === 'Atacante');
+            findAndAssign(2, p => p.posPrimaria === 'Defensa Central');
+            findAndAssign(5.1, p => p.posPrimaria === 'Volante Central');
+            findAndAssign(5.2, p => p.posPrimaria === 'Volante Central');
+            findAndAssign(7, p => p.posPrimaria === 'Volante Lateral');
+            findAndAssign(8, p => p.posPrimaria === 'Volante Lateral');
+            findAndAssign(3, p => p.posPrimaria === 'Defensa Lateral');
+            findAndAssign(4, p => p.posPrimaria === 'Defensa Lateral');
+            findAndAssign(6, p => p.posPrimaria.includes('Defensa')); // El que quede
+            
+            // Rellenar los huecos con los jugadores restantes
+            const remainingPlayers = team.filter(p => !assignedPlayers.has(p.id));
+            const neededNumbers = [3,2,6,4,7,5.1,5.2,8,9].filter(num => !positions.some(p => p.number === num));
+            
+            neededNumbers.forEach(num => {
+                if (remainingPlayers.length > 0) {
+                    const player = remainingPlayers.shift();
+                    positions.push({ player, number: num });
+                    assignedPlayers.add(player.id);
+                }
+            });
+            return positions;
         };
 
         const drawTeam = (positions, teamClass) => {
             const teamDisplay = document.createElement('div');
             teamDisplay.className = `team-display ${teamClass}`;
-            let centralMidCount = 0;
 
-            positions.forEach(({player, number}) => {
-                let coords = teamClass === 'teamA' ? posCoords[number] : {x: 100 - posCoords[number].x, y: posCoords[number].y};
-                if(number === 5) {
-                    centralMidCount++;
-                    if (centralMidCount === 2) {
-                        coords = teamClass === 'teamA' ? {x:40, y:65} : {x:60, y:65}; // Ajusta posición del 2do volante central
-                    }
+            positions.forEach(({ player, number }) => {
+                const displayNum = Math.floor(number); // Quita el decimal para mostrar (5.1 -> 5)
+                let coords = posCoords[number];
+
+                if (teamClass === 'teamB') {
+                    coords = { x: 100 - coords.x, y: coords.y };
                 }
 
                 const playerToken = document.createElement('div');
                 playerToken.className = 'player-token';
                 playerToken.style.left = `${coords.x}%`;
                 playerToken.style.top = `${coords.y}%`;
-                playerToken.innerHTML = `<img src="${player.foto || 'assets/images/default-player.png'}" alt="${player.nombre}"><span>[${number}] ${player.nombre} ${player.apellido}</span>`;
+                playerToken.innerHTML = `<img src="${player.foto || 'assets/images/default-player.png'}" alt="${player.nombre}"><span>[${displayNum}] ${player.nombre} ${player.apellido}</span>`;
                 teamDisplay.appendChild(playerToken);
             });
             pitchDisplay.appendChild(teamDisplay);
         };
+
+        const positionsA = assignPositions(teamA.players);
+        const positionsB = assignPositions(teamB.players);
         
         drawTeam(positionsA, 'teamA');
         drawTeam(positionsB, 'teamB');
@@ -415,20 +412,45 @@ const teamBuilder = {
 
     displayTeamLists(teamA, teamB) {
         const container = document.getElementById('roster-column');
-        const generateList = (team, teamName, teamClass) => {
-            let defenderNumbers = [3, 4, 6], midfielderNumbers = [7, 8];
-            const assignNumber = (player) => {
-                if (player.posPrimaria === 'Defensa Central') return 2;
-                if (player.posPrimaria.includes('Defensa')) return defenderNumbers.shift() || '?';
-                if (player.posPrimaria === 'Volante Central') return 5;
-                if (player.posPrimaria.includes('Volante')) return midfielderNumbers.shift() || '?';
-                if (player.posPrimaria === 'Atacante') return 9;
-                return '?';
+
+        const generateDetailedList = (team, teamName, teamClass) => {
+            team.forEach(p => p.tempScore = p.posPrimaria === 'Arquero' ? 5.0 : parseFloat(p.puntajeGeneral));
+
+            const defenders = team.filter(p => p.posPrimaria.includes('Defensa') || p.posPrimaria === 'Arquero');
+            const midfielders = team.filter(p => p.posPrimaria.includes('Volante'));
+            const attackers = team.filter(p => p.posPrimaria.includes('Atacante'));
+
+            const calculateAverage = (arr) => {
+                if (arr.length === 0) return 'N/A';
+                const sum = arr.reduce((acc, p) => acc + p.tempScore, 0);
+                return (sum / arr.length).toFixed(1);
             };
-            const playerItems = team.players.map(p => `<li>[${assignNumber(p)}] ${p.nombre} ${p.apellido}</li>`).join('');
-            return `<h4>${teamName}</h4><ul class="team-roster-list ${teamClass}">${playerItems}</ul>`;
+
+            let html = `<div class="roster-details"><h4>${teamName}</h4>`;
+
+            // Sección Defensa
+            html += `<div class="roster-section"><strong>Defensa (Prom: ${calculateAverage(defenders)})</strong>`;
+            html += `<ul class="team-roster-list ${teamClass}">`;
+            defenders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            html += `</ul></div>`;
+
+            // Sección Volantes
+            html += `<div class="roster-section"><strong>Volantes (Prom: ${calculateAverage(midfielders)})</strong>`;
+            html += `<ul class="team-roster-list ${teamClass}">`;
+            midfielders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            html += `</ul></div>`;
+
+            // Sección Delanteros
+            html += `<div class="roster-section"><strong>Delanteros (Prom: ${calculateAverage(attackers)})</strong>`;
+            html += `<ul class="team-roster-list ${teamClass}">`;
+            attackers.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            html += `</ul></div>`;
+            
+            html += `</div>`;
+            return html;
         };
-        container.innerHTML = generateList(teamA, "Equipo A", "teamA") + generateList(teamB, "Equipo B", "teamB");
+        
+        container.innerHTML = generateDetailedList(teamA.players, "Equipo A", "teamA") + generateDetailedList(teamB.players, "Equipo B", "teamB");
     },
     
     async startMatch() {
@@ -440,6 +462,7 @@ const teamBuilder = {
         }
     }
 };
+
 
 
 
