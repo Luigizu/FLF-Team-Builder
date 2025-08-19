@@ -98,7 +98,7 @@ render(allPlayers) {
         });
     },
 
-   resolveUnmatchedPlayer(name, availablePlayers) {
+ resolveUnmatchedPlayer(name, availablePlayers) {
         return new Promise(resolve => {
             const modalContainer = document.getElementById('modal-container');
             const modalContent = document.getElementById('modal-content');
@@ -113,6 +113,7 @@ render(allPlayers) {
                     <h4>Crear: ${name}</h4>
                     <input id="new-player-nombre" type="text" placeholder="Nombre" value="${name.split(' ')[0] || ''}">
                     <input id="new-player-apellido" type="text" placeholder="Apellido" value="${name.split(' ')[1] || ''}">
+                    <input id="new-player-apodo" type="text" placeholder="Apodo (Opcional)">
                     <select id="new-player-pos1"><option value="">Posición Primaria</option><option>Arquero</option><option>Defensa Central</option><option>Defensa Lateral</option><option>Volante Central</option><option>Volante Lateral</option><option>Atacante</option></select>
                     <select id="new-player-pos2"><option value="">Posición Secundaria (Opcional)</option><option>Arquero</option><option>Defensa Central</option><option>Defensa Lateral</option><option>Volante Central</option><option>Volante Lateral</option><option>Atacante</option></select>
                     <label for="new-player-habilidad">Puntaje General (1.0 - 5.0)</label>
@@ -122,10 +123,9 @@ render(allPlayers) {
                 <button id="cancel-unmatched" class="cancel-btn">Cancelar</button>
             `;
             modalContainer.classList.remove('hidden');
-
+            
             const searchInput = document.getElementById('search-player-input');
             const searchResultsContainer = document.getElementById('search-results');
-
             const renderResults = (query) => {
                 searchResultsContainer.innerHTML = '';
                 if (!query) return;
@@ -138,7 +138,6 @@ render(allPlayers) {
                     searchResultsContainer.appendChild(item);
                 });
             };
-            
             searchInput.addEventListener('keyup', (e) => renderResults(e.target.value));
 
             document.getElementById('show-create-new-player').onclick = () => {
@@ -154,14 +153,15 @@ render(allPlayers) {
                 const newPlayerData = {
                     nombre: document.getElementById('new-player-nombre').value,
                     apellido: document.getElementById('new-player-apellido').value,
+                    apodo: document.getElementById('new-player-apodo').value,
                     posPrimaria: document.getElementById('new-player-pos1').value,
                     posSecundaria: document.getElementById('new-player-pos2').value,
-                    puntajeGeneral: puntaje,
-                    apodo: ''
+                    puntajeGeneral: puntaje
                 };
                 await api.post({ action: 'addPlayer', player: newPlayerData });
-                window.appState.players = await api.get('getPlayers');
-                const addedPlayer = window.appState.players[window.appState.players.length - 1];
+                // Volvemos a cargar TODOS los jugadores para que la lista global esté actualizada
+                window.appState.players = await api.get('getPlayers'); 
+                const addedPlayer = window.appState.players.find(p => p.nombre === newPlayerData.nombre && p.apellido === newPlayerData.apellido);
                 modalContainer.classList.add('hidden');
                 resolve(addedPlayer);
             };
@@ -375,6 +375,7 @@ render(allPlayers) {
         }
     }
 };
+
 
 
 
