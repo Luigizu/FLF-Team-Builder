@@ -225,102 +225,147 @@ const teamBuilder = {
     },
     
     // CORREGIDO: Algoritmo de balanceo reescrito para evitar duplicados y seguir reglas
-    balanceTeams(players) {
-        let teamA = { players: [], score: 0 };
-        let teamB = { players: [], score: 0 };
-        let available = [...players]; // Copia de la lista de jugadores que se irá reduciendo
+balanceTeams(players) {
+        // Objeto para los equipos, que contendrá las listas de jugadores por línea
+        const teamA = { players: [], defenders: [], midfielders: [], attackers: [], score: 0 };
+        const teamB = { players: [], defenders: [], midfielders: [], attackers: [], score: 0 };
+        let available = [...players];
 
-        available.forEach(p => {
-            p.tempScore = p.posPrimaria === 'Arquero' ? 5.0 : parseFloat(p.puntajeGeneral);
-        });
-        
-        // Función auxiliar para asignar un jugador y removerlo de la lista de disponibles
-        const assignPlayer = (player, team) => {
+        // --- FUNCIONES AUXILIARES ---
+
+        // Función para asignar un jugador a un equipo y a su línea correspondiente
+        const assignPlayer = (player, team, line) => {
             team.players.push(player);
-            team.score += player.tempScore;
+            team[line].push(player);
+            team.score += parseFloat(player.puntajeGeneral);
             available = available.filter(p => p.id !== player.id);
         };
 
-        // Categorizamos a TODOS los jugadores disponibles UNA SOLA VEZ
-        let defenders = available.filter(p => p.posPrimaria.includes('Defensa') || p.posPrimaria === 'Arquero').sort((a,b) => b.tempScore - a.tempScore);
-        let midfielders = available.filter(p => p.posPrimaria.includes('Volante')).sort((a,b) => b.tempScore - a.tempScore);
-        let attackers = available.filter(p => p.posPrimaria.includes('Atacante')).sort((a,b) => b.tempScore - a.tempScore);
-        
-        // --- PROCESO DE ARMADO SECUENCIAL ---
+        // Función para la lógica de "suma descendente"
+        const distributeByDescendingSum = (playersToDistribute, teamA, teamB, line, lineSize) => {
+            // Determinar qué equipo empieza basándose en el puntaje actual de esa línea
+            let turnForA = (teamA[line].reduce((acc, p) => acc + p.puntajeGeneral, 0) <= teamB[line].reduce((acc, p) => acc + p.puntajeGeneral, 0));
+            
+            if (teamA[line].length > teamB[line].length) turnForA = false;
+            if (teamB[line].length > teamA[line].length) turnForA = true;
 
-        // 1. DEFENSAS (4 por equipo)
-        for (let i = 0; i < 8; i++) {
-            if (defenders.length === 0) break;
-            const player = defenders.shift(); // Saca al mejor defensor disponible
-            const scoreA = teamA.players.filter(p => p.posPrimaria.includes('Defensa')).reduce((acc, p) => acc + p.tempScore, 0);
-            const scoreB = teamB.players.filter(p => p.posPrimaria.includes('Defensa')).reduce((acc, p) => acc + p.tempScore, 0);
-            
-            if (teamA.players.filter(p => p.posPrimaria.includes('Defensa')).length <= teamB.players.filter(p => p.posPrimaria.includes('Defensa')).length) {
-                assignPlayer(player, teamA);
-            } else {
-                assignPlayer(player, teamB);
-            }
-        }
+            for (const player of playersToDistribute) {
+                if (teamA[line].length >= lineSize && teamB[line].length >= lineSize) break;
 
-        // 2. VOLANTES (4 por equipo, con reglas)
-        for (let i = 0; i < 8; i++) {
-            if (midfielders.length === 0) break;
-            
-            const teamACentralMids = teamA.players.filter(p => p.posPrimaria === 'Volante Central').length;
-            const teamBCentralMids = teamB.players.filter(p => p.posPrimaria === 'Volante Central').length;
-
-            // Busca un jugador que NO rompa la regla de los 2 volantes centrales
-            let playerIndex = midfielders.findIndex(p => 
-                (teamA.players.filter(pl => pl.posPrimaria.includes('Volante')).length < 4 && (p.posPrimaria !== 'Volante Central' || teamACentralMids < 2)) ||
-                (teamB.players.filter(pl => pl.posPrimaria.includes('Volante')).length < 4 && (p.posPrimaria !== 'Volante Central' || teamBCentralMids < 2))
-            );
-            if (playerIndex === -1) playerIndex = 0; // Si todos rompen la regla, toma el primero
-            
-            const player = midfielders.splice(playerIndex, 1)[0];
-            
-             if (teamA.players.filter(p => p.posPrimaria.includes('Volante')).length <= teamB.players.filter(p => p.posPrimaria.includes('Volante')).length) {
-                if (player.posPrimaria !== 'Volante Central' || teamACentralMids < 2) {
-                    assignPlayer(player, teamA);
-                } else { // Si no puede ir a A, intenta en B
-                    if (teamBCentralMids < 2) assignPlayer(player, teamB);
-                    else midfielders.push(player); // Devuelve al pool si no cabe en ningún lado
-                }
-            } else {
-                if (player.posPrimaria !== 'Volante Central' || teamBCentralMids < 2) {
-                    assignPlayer(player, teamB);
+                if (turnForA) {
+                    if (teamA[line].length < lineSize) {
+                        assignPlayer(player, teamA, line);
+                    } else { // Si el equipo A ya está lleno en esa línea, va para el B
+                        assignPlayer(player, teamB, line);
+                    }
                 } else {
-                    if (teamACentralMids < 2) assignPlayer(player, teamA);
-                    else midfielders.push(player);
+                    if (teamB[line].length < lineSize) {
+                        assignPlayer(player, teamB, line);
+                    } else { // Si el equipo B ya está lleno, va para el A
+                        assignPlayer(player, teamA, line);
+                    }
                 }
+                // Cambiar el turno para la siguiente asignación
+                turnForA = !turnForA;
+            }
+        };
+
+        // --- INICIO DEL PROCESO DE ARMADO SECUENCIAL ---
+
+        // PASO 1: Distribuir Arquero y Defensores Centrales
+        let centralDefenders = available.filter(p => p.posPrimaria === 'Defensa Central' || p.posPrimaria === 'Arquero').sort((a, b) => b.puntajeGeneral - a.puntajeGeneral);
+        if (centralDefenders.length > 0) {
+            // Caso: 1 GK y 2 DC -> GK con el DC de menor calidad
+            const gk = centralDefenders.find(p => p.posPrimaria === 'Arquero');
+            const dcs = centralDefenders.filter(p => p.posPrimaria === 'Defensa Central');
+
+            if (gk && dcs.length >= 2) {
+                assignPlayer(gk, teamA, 'defenders');
+                assignPlayer(dcs[1], teamA, 'defenders'); // El de menor puntaje con el arquero
+                assignPlayer(dcs[0], teamB, 'defenders'); // El de mayor puntaje al otro equipo
+            } else { // Otros casos: 1 GK/1DC, 2DC, 1DC, etc.
+                 distributeByDescendingSum(centralDefenders, teamA, teamB, 'defenders', 2);
             }
         }
+        
+        // PASO 2: Distribuir Defensores Laterales
+        let lateralDefendersPool = available
+            .filter(p => p.posPrimaria === 'Defensa Lateral' || p.posSecundaria === 'Defensa Lateral')
+            .sort((a, b) => (b.posPrimaria === 'Defensa Lateral' ? 0.1 : 0) - (a.posPrimaria === 'Defensa Lateral' ? 0.1 : 0)) // Prioridad a posPrimaria
+            .sort((a, b) => (b.posSecundaria ? 0 : 0.1) - (a.posSecundaria ? 0 : 0.1)) // Prioridad a sin posSecundaria
+            .sort((a, b) => b.puntajeGeneral - a.puntajeGeneral);
 
-        // 3. DELANTEROS (1 por equipo, para compensar)
-        for (let i = 0; i < 2; i++) {
-            if (attackers.length === 0) break;
-            const player = attackers.shift();
-            if(teamA.players.length < 9 && teamB.players.length < 9) {
-                 if (teamA.score <= teamB.score) assignPlayer(player, teamA);
-                 else assignPlayer(player, teamB);
-            } else if (teamA.players.length < 9) {
-                 assignPlayer(player, teamA);
+        distributeByDescendingSum(lateralDefendersPool, teamA, teamB, 'defenders', 4);
+        
+        // PASO 3: Distribuir Atacantes
+        let attackersPool = available
+            .filter(p => p.posPrimaria === 'Atacante' || p.posSecundaria === 'Atacante')
+            .sort((a, b) => b.puntajeGeneral - a.puntajeGeneral);
+        
+        if (attackersPool.length >= 2) {
+            // Asignar los dos mejores, uno a cada equipo para que queden parejos
+            assignPlayer(attackersPool.shift(), teamA, 'attackers');
+            assignPlayer(attackersPool.shift(), teamB, 'attackers');
+        } else if (attackersPool.length === 1) {
+            // Si solo hay uno, se lo damos al equipo con defensa más débil para compensar
+            const teamADefenseScore = teamA.defenders.reduce((acc, p) => acc + p.puntajeGeneral, 0);
+            const teamBDefenseScore = teamB.defenders.reduce((acc, p) => acc + p.puntajeGeneral, 0);
+            if(teamADefenseScore <= teamBDefenseScore) {
+                 assignPlayer(attackersPool.shift(), teamA, 'attackers');
             } else {
-                 assignPlayer(player, teamB);
+                 assignPlayer(attackersPool.shift(), teamB, 'attackers');
             }
         }
         
-        // 4. RELLENO FINAL (con lo que sobre de cualquier posición)
-        const leftovers = [...defenders, ...midfielders, ...attackers, ...available.filter(p => !p.posPrimaria)];
-        leftovers.sort((a,b) => b.tempScore - a.tempScore);
-        
-        while (teamA.players.length < 9 && leftovers.length > 0) {
-            assignPlayer(leftovers.shift(), teamA);
-        }
-        while (teamB.players.length < 9 && leftovers.length > 0) {
-            assignPlayer(leftovers.shift(), teamB);
+        // PASO 4: Distribuir Volantes Centrales (con compensación de ataque)
+        let centralMidfielders = available
+            .filter(p => p.posPrimaria === 'Volante Central')
+            .sort((a, b) => b.puntajeGeneral - a.puntajeGeneral);
+
+        if (centralMidfielders.length >= 2) {
+            const teamAAttackScore = teamA.attackers.reduce((acc, p) => acc + p.puntajeGeneral, 0);
+            const teamBAttackScore = teamB.attackers.reduce((acc, p) => acc + p.puntajeGeneral, 0);
+
+            // El equipo con el atacante de MENOR puntaje, recibe al volante central de MAYOR puntaje
+            let weakerAttackTeam = (teamAAttackScore <= teamBAttackScore) ? teamA : teamB;
+            let strongerAttackTeam = (teamAAttackScore > teamBAttackScore) ? teamA : teamB;
+
+            assignPlayer(centralMidfielders.shift(), weakerAttackTeam, 'midfielders');
+            if (centralMidfielders.length > 0) {
+                 assignPlayer(centralMidfielders.shift(), strongerAttackTeam, 'midfielders');
+            }
+             // Si hay más, se reparten por suma descendente
+            if (centralMidfielders.length > 0) {
+                 distributeByDescendingSum(centralMidfielders, teamA, teamB, 'midfielders', 4);
+            }
         }
 
-        players.forEach(p => { delete p.tempScore; });
+        // PASO 5: Distribuir Volantes Laterales
+        let lateralMidfieldersPool = available
+            .filter(p => p.posPrimaria === 'Volante Lateral' || p.posSecundaria === 'Volante Lateral')
+            .sort((a, b) => b.puntajeGeneral - a.puntajeGeneral);
+        
+        distributeByDescendingSum(lateralMidfieldersPool, teamA, teamB, 'midfielders', 4);
+
+        // PASO 6: Relleno final con los jugadores sobrantes
+        const leftovers = available.sort((a,b) => b.puntajeGeneral - a.puntajeGeneral);
+        while ((teamA.players.length < 9 || teamB.players.length < 9) && leftovers.length > 0) {
+             let playerToAssign = leftovers.shift();
+             // Asignar al equipo con menos jugadores o, si tienen los mismos, al de menor puntaje total
+             if (teamA.players.length <= teamB.players.length) {
+                // Determinar la línea más vacía para este jugador
+                if(teamA.defenders.length < 4) assignPlayer(playerToAssign, teamA, 'defenders');
+                else if (teamA.midfielders.length < 4) assignPlayer(playerToAssign, teamA, 'midfielders');
+                else if (teamA.attackers.length < 1) assignPlayer(playerToAssign, teamA, 'attackers');
+                else assignPlayer(playerToAssign, teamA, 'midfielders'); // Por defecto al medio
+             } else {
+                if(teamB.defenders.length < 4) assignPlayer(playerToAssign, teamB, 'defenders');
+                else if (teamB.midfielders.length < 4) assignPlayer(playerToAssign, teamB, 'midfielders');
+                else if (teamB.attackers.length < 1) assignPlayer(playerToAssign, teamB, 'attackers');
+                else assignPlayer(playerToAssign, teamB, 'midfielders');
+             }
+        }
+        
         return { teamA, teamB };
     },
     
@@ -336,12 +381,12 @@ const teamBuilder = {
             6: { x: 15, y: 60 },
             4: { x: 15, y: 80 },
             // Volantes (Columna 2)
-            7: { x: 35, y: 20 }, // Delante del 3
-            5.1: { x: 35, y: 40 }, // Delante del 2 (usamos .1 y .2 para diferenciar los dos 5)
-            5.2: { x: 35, y: 60 }, // Delante del 6
-            8: { x: 35, y: 80 }, // Delante del 4
+            7: { x: 32, y: 20 }, // Delante del 3
+            5.1: { x: 32, y: 40 }, // Delante del 2 (usamos .1 y .2 para diferenciar los dos 5)
+            5.2: { x: 32, y: 60 }, // Delante del 6
+            8: { x: 32, y: 80 }, // Delante del 4
             // Delantero (Columna 3)
-            9: { x: 47, y: 50 }
+            9: { x: 44, y: 50 }
         };
 
         const assignPositions = (team) => {
@@ -413,45 +458,38 @@ const teamBuilder = {
     displayTeamLists(teamA, teamB) {
         const container = document.getElementById('roster-column');
 
+        // La nueva función `balanceTeams` ya nos da los jugadores separados por línea asignada
         const generateDetailedList = (team, teamName, teamClass) => {
-            team.forEach(p => p.tempScore = p.posPrimaria === 'Arquero' ? 5.0 : parseFloat(p.puntajeGeneral));
-
-            const defenders = team.filter(p => p.posPrimaria.includes('Defensa') || p.posPrimaria === 'Arquero');
-            const midfielders = team.filter(p => p.posPrimaria.includes('Volante'));
-            const attackers = team.filter(p => p.posPrimaria.includes('Atacante'));
-
+            
             const calculateAverage = (arr) => {
-                if (arr.length === 0) return 'N/A';
-                const sum = arr.reduce((acc, p) => acc + p.tempScore, 0);
+                if (!arr || arr.length === 0) return 'N/A';
+                const sum = arr.reduce((acc, p) => acc + parseFloat(p.puntajeGeneral), 0);
                 return (sum / arr.length).toFixed(1);
             };
 
-            let html = `<div class="roster-details"><h4>${teamName}</h4>`;
+            let html = `<div class="roster-details"><h4>${teamName} (Prom: ${calculateAverage(team.players)})</h4>`;
 
             // Sección Defensa
-            html += `<div class="roster-section"><strong>Defensa (Prom: ${calculateAverage(defenders)})</strong>`;
+            html += `<div class="roster-section"><strong>Defensa (Prom: ${calculateAverage(team.defenders)})</strong>`;
             html += `<ul class="team-roster-list ${teamClass}">`;
-            defenders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            team.defenders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.puntajeGeneral.toFixed(1)}</strong></li>`; });
             html += `</ul></div>`;
 
             // Sección Volantes
-            html += `<div class="roster-section"><strong>Volantes (Prom: ${calculateAverage(midfielders)})</strong>`;
+            html += `<div class="roster-section"><strong>Volantes (Prom: ${calculateAverage(team.midfielders)})</strong>`;
             html += `<ul class="team-roster-list ${teamClass}">`;
-            midfielders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            team.midfielders.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.puntajeGeneral.toFixed(1)}</strong></li>`; });
             html += `</ul></div>`;
 
             // Sección Delanteros
-            html += `<div class="roster-section"><strong>Delanteros (Prom: ${calculateAverage(attackers)})</strong>`;
+            html += `<div class="roster-section"><strong>Delanteros (Prom: ${calculateAverage(team.attackers)})</strong>`;
             html += `<ul class="team-roster-list ${teamClass}">`;
-            attackers.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.tempScore.toFixed(1)}</strong></li>`; });
+            team.attackers.forEach(p => { html += `<li>${p.nombre} ${p.apellido} - <strong>${p.puntajeGeneral.toFixed(1)}</strong></li>`; });
             html += `</ul></div>`;
             
             html += `</div>`;
             return html;
         };
-        
-        container.innerHTML = generateDetailedList(teamA.players, "Equipo A", "teamA") + generateDetailedList(teamB.players, "Equipo B", "teamB");
-    },
     
     async startMatch() {
         if (this.currentMatchup) {
@@ -462,3 +500,4 @@ const teamBuilder = {
         }
     }
 };
+
