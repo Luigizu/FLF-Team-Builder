@@ -455,7 +455,7 @@ balanceTeams(players) {
         drawTeam(positionsB, 'teamB');
     },
 
-    displayTeamLists(teamA, teamB) {
+displayTeamLists(teamA, teamB) {
         const container = document.getElementById('roster-column');
 
         // La nueva función `balanceTeams` ya nos da los jugadores separados por línea asignada
@@ -490,6 +490,9 @@ balanceTeams(players) {
             html += `</div>`;
             return html;
         };
+        
+        container.innerHTML = generateDetailedList(teamA, "Equipo A", "teamA") + generateDetailedList(teamB, "Equipo B", "teamB");
+    },
     
     async startMatch() {
         if (this.currentMatchup) {
@@ -500,4 +503,5 @@ balanceTeams(players) {
         }
     }
 };
+
 
