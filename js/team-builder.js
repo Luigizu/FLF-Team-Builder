@@ -1,81 +1,30 @@
-const teamBuilder = {
-    render(allPlayers) {
+render(allPlayers) {
         const container = document.getElementById('team-builder-screen');
-        container.innerHTML = `
-            <h2>Armar Equipos</h2>
-            <div class="three-column-layout">
-                <div class="input-column">
-                    <h3>Jugadores de Hoy</h3>
-                    <p>Pega la lista numerada de jugadores aquí:</p>
-                    <textarea id="player-list-input" placeholder="1. Nico A\n2. Pala\n3. Nico"></textarea>
-                    <button id="generate-teams-btn">Generar Equipos</button>
-                </div>
-                <div class="pitch-column">
-                    <div class="pitch-container">
-                         <div id="pitch-display" class="pitch"></div>
-                    </div>
-                    <div id="match-controls" class="hidden" style="text-align:center; margin-top:1rem;">
-                         <button id="rearm-btn">Rearmar Equipos</button>
-                         <button id="start-match-btn">Comenzar Partido</button>
-                    </div>
-                </div>
-                <div class="roster-column" id="roster-column"></div>
-            </div>
-        `;
+        container.innerHTML = `<h2>Armar Equipos</h2><div class="three-column-layout"><div class="input-column"><h3>Jugadores de Hoy</h3><p>Pega la lista numerada de jugadores aquí:</p><textarea id="player-list-input" placeholder="1. Nico A\n2. Pala\n3. Nico"></textarea><button id="generate-teams-btn">Generar Equipos</button></div><div class="pitch-column"><div class="pitch-container"><div id="pitch-display" class="pitch"></div></div><div id="match-controls" class="hidden" style="text-align:center; margin-top:1rem;"><button id="rearm-btn">Rearmar Equipos</button><button id="start-match-btn">Comenzar Partido</button></div></div><div class="roster-column" id="roster-column"></div></div>`;
         document.getElementById('generate-teams-btn').addEventListener('click', () => this.processPlayerList(allPlayers));
     },
-
-    cleanPastedNames(text) {
-        return text.split('\n')
-            .map(line => line.replace(/^\d+\.?[)\]\s]*/, '').trim())
-            .filter(Boolean);
-    },
-
+    cleanPastedNames(text) { return text.split('\n').map(line => line.replace(/^\d+\.?[)\]\s]*/, '').trim()).filter(Boolean); },
     async processPlayerList(allPlayers) {
-        const input = document.getElementById('player-list-input').value;
-        const pastedNames = this.cleanPastedNames(input);
-        
-        let playersForToday = [];
-        let availablePlayers = [...allPlayers];
-
+        const input = document.getElementById('player-list-input').value; const pastedNames = this.cleanPastedNames(input);
+        let playersForToday = []; let availablePlayers = [...allPlayers];
         for (const name of pastedNames) {
-            const results = this.findPlayer(name, availablePlayers);
-            let chosenPlayer;
-
-            if (results.length === 1 && results[0].score < 0.01) { // Coincidencia casi perfecta, se acepta automáticamente
-                chosenPlayer = results[0].player;
-            } else if (results.length === 1) { // Una sola coincidencia, pero no es perfecta. Pedir confirmación.
-                chosenPlayer = await this.confirmSingleMatch(name, results[0].player, availablePlayers);
-            } else if (results.length > 1) { // Múltiples coincidencias
-                chosenPlayer = await this.resolveAmbiguity(name, results.map(r => r.player));
-            } else { // Sin coincidencias
-                chosenPlayer = await this.resolveUnmatchedPlayer(name, availablePlayers);
-            }
-
-            if (chosenPlayer) {
-                playersForToday.push(chosenPlayer);
-                availablePlayers = availablePlayers.filter(p => p.id !== chosenPlayer.id);
-            } else {
-                alert(`Proceso cancelado. No se pudo resolver al jugador "${name}".`);
-                return;
-            }
+            const results = this.findPlayer(name, availablePlayers); let chosenPlayer;
+            if (results.length === 1 && results[0].score < 0.01) { chosenPlayer = results[0].player; }
+            else if (results.length === 1) { chosenPlayer = await this.confirmSingleMatch(name, results[0].player, availablePlayers); }
+            else if (results.length > 1) { chosenPlayer = await this.resolveAmbiguity(name, results.map(r => r.player)); }
+            else { chosenPlayer = await this.resolveUnmatchedPlayer(name, availablePlayers); }
+            if (chosenPlayer) { playersForToday.push(chosenPlayer); availablePlayers = availablePlayers.filter(p => p.id !== chosenPlayer.id); }
+            else { alert(`Proceso cancelado. No se pudo resolver al jugador "${name}".`); return; }
         }
-        
-        if (playersForToday.length < 18) {
-            alert(`Se necesitan 18 jugadores. Solo se resolvieron ${playersForToday.length}.`);
-            return;
-        }
-
+        if (playersForToday.length < 18) { alert(`Se necesitan 18 jugadores. Solo se resolvieron ${playersForToday.length}.`); return; }
         const { teamA, teamB } = this.balanceTeams(playersForToday.slice(0, 18));
-        this.displayTeamsOnPitch(teamA, teamB);
-        this.displayTeamLists(teamA, teamB);
-
-        this.currentMatchup = { teamA, teamB };
+        const { positionsA, positionsB } = this.assignFinalPositionsAndNumbers(teamA, teamB);
+        this.displayTeamsOnPitch(positionsA, positionsB); this.displayTeamLists(positionsA, positionsB);
+        this.currentMatchup = { teamA: positionsA.map(p => p.player), teamB: positionsB.map(p => p.player) };
         document.getElementById('match-controls').classList.remove('hidden');
         document.getElementById('start-match-btn').onclick = () => this.startMatch();
         document.getElementById('rearm-btn').onclick = () => this.processPlayerList(allPlayers);
     },
-    
     findPlayer(name, playerPool) {
         const options = {
             keys: [{ name: 'nombre', weight: 0.5 }, { name: 'apellido', weight: 0.3 }, { name: 'apodo', weight: 0.7 }],
@@ -426,6 +375,7 @@ const teamBuilder = {
         }
     }
 };
+
 
 
 
